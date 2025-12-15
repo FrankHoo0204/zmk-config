@@ -1,0 +1,5 @@
+include:
+  - board: glove80_lh
+  - board: glove80_rh
+  - board: nrf52840dongle
+    shield: nrf52840dongle

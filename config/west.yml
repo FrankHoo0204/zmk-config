@@ -1,7 +1,7 @@
 manifest:
   version: "0.10"
   remotes:
-    zmkfw:
+    - name: zmkfw
       url: https://github.com/zmkfirmware/zmk.git
       fetch: +refs/heads/main:refs/remotes/zmkfw/main
   defaults:

@@ -1,20 +1,19 @@
 on: [push, pull_request, workflow_dispatch]
 
-name: Build
+name: Build ZMK firmware
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
       image: zmkfirmware/zmk-build-arm:2.5
-    name: Build
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+
       - name: Cache west modules
-        uses: actions/cache@v2
-        env:
-          cache-name: cache-zephyr-modules
+        uses: actions/cache@v4
         with:
           path: |
             modules/
@@ -22,28 +21,35 @@ jobs:
             zephyr/
             bootloader/
             zmk/
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('manifest-dir/west.yml') }}
+          key: ${{ runner.os }}-zmk-${{ hashFiles('config/west.yml') }}
           restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
-      - name: West Init
+            ${{ runner.os }}-zmk-
+
+      - name: West init
         run: west init -l config
-      - name: West Update
+
+      - name: West update
         run: west update
-      - name: West Zephyr export
+
+      - name: West zephyr export
         run: west zephyr-export
-      - name: West Build (KEYBOARD_TITLE)
-        run: west build -s zmk/app -b BOARD_NAME -- -DSHIELD=SHIELD_NAME -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
-      - name: KEYBOARD_TITLE DTS File
-        if: ${{ always() }}
-        run: cat -n build/zephyr/BOARD_NAME.dts.pre.tmp
-      - name: KEYBOARD_TITLE Kconfig file
-        run: cat build/zephyr/.config | grep -v "^#" | grep -v "^$"
-      - name: Rename zmk.uf2
-        run: cp build/zephyr/zmk.uf2 SHIELD_NAME_BOARD_NAME.uf2
-      - name: Archive (KEYBOARD_TITLE)
-        uses: actions/upload-artifact@v2
+
+      - name: Build all boards
+        run: |
+          for entry in $(yq '.include | length' build.yaml); do :; done
+          west build -s zmk/app -b glove80_lh -- -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
+          west build -s zmk/app -b glove80_rh -- -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
+          west build -s zmk/app -b nrf52840dongle -- -DSHIELD=nrf52840dongle -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
+
+      - name: Rename firmware
+        run: |
+          cp build/zephyr/zmk.uf2 glove80_lh.uf2 || true
+          cp build/zephyr/zmk.uf2 glove80_rh.uf2 || true
+          cp build/zephyr/zmk.uf2 nrf52840dongle.uf2 || true
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
         with:
-          name: firmware
-          path: SHIELD_NAME_BOARD_NAME.uf2
+          name: zmk-firmware
+          path: |
+            *.uf2
